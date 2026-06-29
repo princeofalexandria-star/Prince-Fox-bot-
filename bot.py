@@ -13,12 +13,16 @@ from selenium.webdriver.support import expected_conditions as EC
 BOT_TOKEN = "7963335503:AAHwscvP-R9Z6-UaU40U-Uf8fX98XfX98Xf"  
 CHAT_ID = "941436059"
 
-# متغيرات التحكم في حالة تشغيل البوت
 is_running = True
 last_update_id = 0
 
-# خادم الويب الصحيح لقراءة بورت سيرفر ريندر الديناميكي وتخطي الحظر
+# خادم الويب الصحيح للرد على طلبات GET و HEAD من سيرفر ريندر بنجاح 200
 class WebServerHandler(BaseHTTPRequestHandler):
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        
     def do_GET(self):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
@@ -26,7 +30,6 @@ class WebServerHandler(BaseHTTPRequestHandler):
         self.wfile.write(b"Bot is live and scanning OTC pairs successfully!")
 
 def run_port_server():
-    # قراءة المنفذ الذي يفرضه ريندر تلقائياً
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(("0.0.0.0", port), WebServerHandler)
     print(f"WebServer started on port {port}...")
@@ -40,7 +43,6 @@ def send_telegram_message(message):
     except Exception as e:
         print(f"Error sending to Telegram: {e}")
 
-# دالة الاستماع والتحكم الفوري عبر أوامر تليجرام
 def check_telegram_commands():
     global is_running, last_update_id
     url = f"https://telegram.org{BOT_TOKEN}/getUpdates"
@@ -57,7 +59,6 @@ def check_telegram_commands():
                         text = update["message"]["text"].strip().lower()
                         user_chat_id = str(update["message"]["chat"]["id"])
                         
-                        # التأكد من أنك أنت فقط صاحب الحساب من يتحكم بالبوت
                         if user_chat_id == CHAT_ID:
                             if text == "/start":
                                 if not is_running:
@@ -123,13 +124,10 @@ def run_otc_scraper():
         driver.quit()
 
 if __name__ == "__main__":
-    # 1. تشغيل خادم البورت الصحيح المتوافق مع ريندر
     threading.Thread(target=run_port_server, daemon=True).start()
-    
-    # 2. تشغيل دالة الاستماع لأوامر التحكم من التليجرام بالخلفية
     threading.Thread(target=check_telegram_commands, daemon=True).start()
     
-    send_telegram_message("🦊 **تم تشغيل البوت بنجاح وحل مشكلة البورت!**\n\n🎮 يمكنك التحكم الآن بالكامل عبر إرسال الأوامر الآتية:\n🔹 `/start` لبدء الفحص.\n🔹 `/stop` لإيقاف الفحص مؤقتاً.")
+    send_telegram_message("🦊 **تم تشغيل البوت بنجاح وحل مشكلة البورت بالكامل!**\n\n🎮 يمكنك التحكم الآن بالكامل عبر إرسال الأوامر الآتية:\n🔹 `/start` لبدء الفحص.\n🔹 `/stop` لإيقاف الفحص مؤقتاً.")
     
     while True:
         if is_running:
