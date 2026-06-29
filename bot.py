@@ -1,3 +1,4 @@
+import os
 import time
 import requests
 import threading
@@ -12,21 +13,23 @@ from selenium.webdriver.support import expected_conditions as EC
 BOT_TOKEN = "7963335503:AAHwscvP-R9Z6-UaU40U-Uf8fX98XfX98Xf"  
 CHAT_ID = "941436059"
 
-# بيانات حسابك في منصة Pocket Option
-POCKET_EMAIL = "unknown.sex.unknown@gmail.com"
-POCKET_PASSWORD = "yCKuZH2u"
+# متغيرات التحكم في حالة تشغيل البوت
+is_running = True
+last_update_id = 0
 
-# خادم ويب وهمي لخدعة سيرفر ريندر ومنع تعليق البورت والتشغيل المجاني السريع
+# خادم الويب الصحيح لقراءة بورت سيرفر ريندر الديناميكي وتخطي الحظر
 class WebServerHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
-        self.wfile.write(b"Bot is alive and scanning OTC pairs successfully!")
+        self.wfile.write(b"Bot is live and scanning OTC pairs successfully!")
 
 def run_port_server():
-    server = HTTPServer(("0.0.0.0", 10000), WebServerHandler)
-    print("WebServer started on port 10000...")
+    # قراءة المنفذ الذي يفرضه ريندر تلقائياً
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(("0.0.0.0", port), WebServerHandler)
+    print(f"WebServer started on port {port}...")
     server.serve_forever()
 
 def send_telegram_message(message):
@@ -36,6 +39,42 @@ def send_telegram_message(message):
         requests.post(url, json=payload)
     except Exception as e:
         print(f"Error sending to Telegram: {e}")
+
+# دالة الاستماع والتحكم الفوري عبر أوامر تليجرام
+def check_telegram_commands():
+    global is_running, last_update_id
+    url = f"https://telegram.org{BOT_TOKEN}/getUpdates"
+    
+    while True:
+        try:
+            params = {"offset": last_update_id + 1, "timeout": 10}
+            response = requests.get(url, params=params, timeout=15).json()
+            
+            if "result" in response:
+                for update in response["result"]:
+                    last_update_id = update["update_id"]
+                    if "message" in update and "text" in update["message"]:
+                        text = update["message"]["text"].strip().lower()
+                        user_chat_id = str(update["message"]["chat"]["id"])
+                        
+                        # التأكد من أنك أنت فقط صاحب الحساب من يتحكم بالبوت
+                        if user_chat_id == CHAT_ID:
+                            if text == "/start":
+                                if not is_running:
+                                    is_running = True
+                                    send_telegram_message("🟢 **تم تشغيل البوت بنجاح!** بدأ فحص أزواج الـ OTC الآن...")
+                                else:
+                                    send_telegram_message("🤖 البوت يعمل بالفعل ويقوم بالفحص حالياً!")
+                            
+                            elif text == "/stop":
+                                if is_running:
+                                    is_running = False
+                                    send_telegram_message("🔴 **تم إيقاف البوت مؤقتاً!** لن يتم إرسال أي إشارات حتى ترسل أمر التشغيل.")
+                                else:
+                                    send_telegram_message("🤖 البوت متوقف بالفعل!")
+        except Exception as e:
+            print(f"Error checking commands: {e}")
+        time.sleep(3)
 
 def run_otc_scraper():
     chrome_options = Options()
@@ -84,10 +123,18 @@ def run_otc_scraper():
         driver.quit()
 
 if __name__ == "__main__":
-    # تشغيل خادم البورت الوهمي في الخلفية لخداع سيرفر Render
+    # 1. تشغيل خادم البورت الصحيح المتوافق مع ريندر
     threading.Thread(target=run_port_server, daemon=True).start()
     
-    send_telegram_message("🦊 تم حل مشكلة البورت! البوت يعمل الآن بأعلى سرعة من السيرفر المطور وجاري بدء مسح أزواج الـ OTC...")
+    # 2. تشغيل دالة الاستماع لأوامر التحكم من التليجرام بالخلفية
+    threading.Thread(target=check_telegram_commands, daemon=True).start()
+    
+    send_telegram_message("🦊 **تم تشغيل البوت بنجاح وحل مشكلة البورت!**\n\n🎮 يمكنك التحكم الآن بالكامل عبر إرسال الأوامر الآتية:\n🔹 `/start` لبدء الفحص.\n🔹 `/stop` لإيقاف الفحص مؤقتاً.")
+    
     while True:
-        run_otc_scraper()
-        time.sleep(180)
+        if is_running:
+            run_otc_scraper()
+            time.sleep(180)
+        else:
+            print("البوت متوقف حالياً بناءً على أمر المستخدم...")
+            time.sleep(10)
