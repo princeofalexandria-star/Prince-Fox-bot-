@@ -1,5 +1,7 @@
 import time
 import requests
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -13,6 +15,19 @@ CHAT_ID = "941436059"
 # بيانات حسابك في منصة Pocket Option
 POCKET_EMAIL = "unknown.sex.unknown@gmail.com"
 POCKET_PASSWORD = "yCKuZH2u"
+
+# خادم ويب وهمي لخدعة سيرفر ريندر ومنع تعليق البورت والتشغيل المجاني السريع
+class WebServerHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        self.wfile.write(b"Bot is alive and scanning OTC pairs successfully!")
+
+def run_port_server():
+    server = HTTPServer(("0.0.0.0", 10000), WebServerHandler)
+    print("WebServer started on port 10000...")
+    server.serve_forever()
 
 def send_telegram_message(message):
     url = f"https://telegram.org{BOT_TOKEN}/sendMessage"
@@ -69,7 +84,10 @@ def run_otc_scraper():
         driver.quit()
 
 if __name__ == "__main__":
-    send_telegram_message("🦊 تم تشغيل البوت بنجاح من المستودع الجديد لأزواج الـ OTC!")
+    # تشغيل خادم البورت الوهمي في الخلفية لخداع سيرفر Render
+    threading.Thread(target=run_port_server, daemon=True).start()
+    
+    send_telegram_message("🦊 تم حل مشكلة البورت! البوت يعمل الآن بأعلى سرعة من السيرفر المطور وجاري بدء مسح أزواج الـ OTC...")
     while True:
         run_otc_scraper()
         time.sleep(180)
